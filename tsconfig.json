@@ -1,0 +1,10 @@
+{
+    "extends": "@tsconfig/recommended/tsconfig.json",
+    "compilerOptions": {
+        "outDir": "./build"
+    },
+    "include": [
+        "update.ts",
+        "declarations.d.ts"
+    ]
+}

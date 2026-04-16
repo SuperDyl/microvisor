@@ -61,3 +61,10 @@ Example:
 **failOnText**: *OPTIONAL*. If present, the stdout is checked for this line and the command treated as failing if it is present.
 
 If any command fails, the server stops there and returns a 500 level error
+
+## TODO
+
+* Add a password to config
+* Use typescript
+* Simplify code: probably avoid using pm2?
+* Include a systemd file as part of regular projects
