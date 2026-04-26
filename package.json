@@ -6,7 +6,7 @@
   "scripts": {
     "develop": "concurrently -c bgGreen -n 'typescript,node' 'npm run dev-build' 'npm run dev-run'",
     "dev-build": "npx tsc --watch --preserveWatchOutput",
-    "dev-run": "node --watch --watch-preserve-output ./build/update.js -p 3000 -l updateServer",
+    "dev-run": "node --watch --watch-preserve-output ./build/update.js -p 3000 -l updateServer --dev",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "SuperDyl",

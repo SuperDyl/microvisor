@@ -1,8 +1,7 @@
-import express, { Response } from "express";
+import express from "express";
 import expressQueue from "express-queue";
 import { exec } from "child_process";
 import fs from "fs";
-import path from "path";
 
 import yargs from "yargs";
 
@@ -20,6 +19,7 @@ type Options = {
   port: number;
   serverName: string;
   configPath: string;
+  dev: boolean;
 };
 
 const options: Options = yargs
@@ -41,16 +41,21 @@ const options: Options = yargs
   })
   .option("configPath", {
     alias: "c",
-    describe:
-      "path to the config file (assumed to be relative to the parent directory of updateHelper)",
+    describe: "path to the config file (assumed to be relative to the parent directory of updateHelper)",
     type: "string",
     default: "update-config.json",
   })
+  .option("dev", {
+    describe: "Runs using a default development configPath",
+    type: "boolean",
+    default: false,
+  })
   .demandOption(["port", "serverName"]).argv as Options;
 
-const port = options.port;
-const serverName = options.serverName;
-const configFilePath = options.configPath; //path.join("../", options.configPath);
+if (options.dev) {
+  options.configPath = "dev-update-config.json";
+}
+//path.join("../", options.configPath);
 
 const app = express();
 app.use(express.json());
@@ -58,58 +63,60 @@ app.use(expressQueue({ activeLimit: 1, queuedLimit: 2 }));
 
 let config: ConfigFile | null = null;
 try {
-  const configData = fs.readFileSync(configFilePath, "utf8");
+  const configData = fs.readFileSync(options.configPath, "utf8");
   config = JSON.parse(configData);
   // TODO: Confirm that config is the correct format
 } catch (error) {
-  console.error(`Error loading config file '${configFilePath}'`, error);
+  console.error(`Error loading config file '${options.configPath}'`, error);
   process.exit(1);
 }
 
 if (config === null) {
-  console.error(`File was in the wrong format '${configFilePath}'`);
+  console.error(`File was in the wrong format '${options.configPath}'`);
   process.exit(2);
 }
 
 // Helper function to execute a command in a directory
 async function executeCommand (command: string, directory: string): Promise<{stdout: string, stderr: string}> {
   return new Promise((resolve, reject) => {
-    const childProcess = exec(
+    //const childProcess =
+    exec(
       command,
       { cwd: directory },
       (error, stdout, stderr) => {
         console.log(`Executing command "${command}" in "${directory}"...`);
         if (!error) {
           resolve({ stdout, stderr });
-          return;
+        } else {
+          console.error(
+            `Error executing command "${command}" in "${directory}":`,
+            error
+          );
+          console.error(`Command "${command}" exited with error.`, error);
+          reject(new Error(`Command "${command}" exited with error code=${error.code} msg=${error.message}`));
         }
-        //else
-        console.error(
-          `Error executing command "${command}" in "${directory}":`,
-          error
-        );
-        reject(error);
       }
     );
 
-    childProcess.on("exit", (code: number) => {
-      if (code !== 0) {
-        console.error(`Command "${command}" exited with code ${code}`);
-        reject(new Error(`Command "${command}" exited with code ${code}`));
-      }
-    });
+    // childProcess.on("exit", (code: number) => {
+    //   if (code !== 0) {
+    //     console.error(`Command "${command}" exited with code ${code}`);
+    //     reject(new Error(`Command "${command}" exited with code ${code}`));
+    //   }
+    // });
   });
 };
 
 // Function to process the queue
 async function processCommands (commands: Command[]) {
+  console.log(`Executing ${commands.length} commands.`)
   for (const { command, directory, failOnText } of commands) {
     const { stdout } = await executeCommand(
       command,
       directory // path.join("../", directory)
     );
 
-    console.log(stdout);
+    console.log(`OUTPUT: ${stdout}`);
 
     if (failOnText !== undefined && stdout.includes(failOnText)) {
       console.error(`Extra fail case occurred of '${failOnText}' for command '${command}'`);
@@ -119,28 +126,31 @@ async function processCommands (commands: Command[]) {
 };
 
 app.post("/", async (req, res, next) => {
+  console.log("Updating!");
   try {
     const { commands } = config as ConfigFile;
+    console.log("Got commands", commands);
     try {
       await processCommands(commands);
     } catch (error: any) {
       res.status(500).json({message: "Got unexpected error!", error});
+      return;
     }
     res.status(200).json({ message: "Update commands completed successfully" });
 
-    console.log(`Restarting pm2 instance ${serverName}`);
-    const { stdout, stderr } = await executeCommand(
-      `pm2 restart ${serverName}`,
-      "../"
-    );
+    // console.log(`Restarting pm2 instance ${options.serverName}`);
+    // const { stdout, stderr } = await executeCommand(
+    //   `pm2 restart ${options.serverName}`,
+    //   "../"
+    // );
     //should be unreachable!
-    console.error(stderr);
+    // console.error(stderr);
   } catch (error: any) {
     console.log("Attempted marked as failing");
     res.status(500).json({ error: error.message });
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server is listening on port ${port}`);
+app.listen(options.port, () => {
+  console.log(`Server is listening on port ${options.port}`);
 });
