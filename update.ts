@@ -80,8 +80,8 @@ function getConfigFromFile(configPath: string): ConfigFile {
   if (!config) {
     throw new Error(`Config file is not a valid json format! Check ${options.configPath}`);
   }
-  if (config!.commands === undefined || !Array.isArray(config!.commands)) {
-    throw new Error(`Config commands section is incorrect Path=${options.configPath} commands=${config!.commands}`);
+  if (config.commands === undefined || !Array.isArray(config.commands)) {
+    throw new Error(`Config 'commands' section is incorrect Path=${options.configPath} commands=${config.commands}`);
   }
 
   return config;
@@ -135,30 +135,47 @@ async function processCommands(commands: Command[]) {
   }
 };
 
+type RequestBody = {
+  secret: string;
+};
+
 app.post("/", async (req, res, next) => {
-  console.log("Updating!");
+  console.log("Got request!");
+  const { commands } = config as ConfigFile;
+
   try {
-    const { commands } = config as ConfigFile;
-    console.log("Got commands", commands);
-    try {
-      await processCommands(commands);
-    } catch (error: any) {
-      res.status(500).json({ message: "Got unexpected error!", error });
+    const body = JSON.parse(req.body) as RequestBody;
+    if (!body || !body.secret) {
+      res.status(400).json({ message: "Missing required JSON body with 'secret' field." });
       return;
     }
-    res.status(200).json({ message: "Update commands completed successfully" });
-
-    // console.log(`Restarting pm2 instance ${options.serverName}`);
-    // const { stdout, stderr } = await executeCommand(
-    //   `pm2 restart ${options.serverName}`,
-    //   "../"
-    // );
-    //should be unreachable!
-    // console.error(stderr);
-  } catch (error: any) {
-    console.log("Attempted marked as failing");
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    res.status(400).json({ message: "Could not parse JSON body! Required JSON body with 'secret' field." });
+    return;
   }
+
+  if (req.body)
+
+    try {
+      try {
+        await processCommands(commands);
+      } catch (error: any) {
+        res.status(500).json({ message: "Got unexpected error!", error });
+        return;
+      }
+      res.status(200).json({ message: "Update commands completed successfully" });
+
+      // console.log(`Restarting pm2 instance ${options.serverName}`);
+      // const { stdout, stderr } = await executeCommand(
+      //   `pm2 restart ${options.serverName}`,
+      //   "../"
+      // );
+      //should be unreachable!
+      // console.error(stderr);
+    } catch (error: any) {
+      console.log("Attempted marked as failing");
+      res.status(500).json({ error: error.message });
+    }
 });
 
 app.listen(options.port, () => {
