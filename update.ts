@@ -1,24 +1,15 @@
 import express from "express";
 import expressQueue from "express-queue";
-import { exec } from "child_process";
-import fs from "fs";
+import { ChildProcess, execFile, spawn } from "child_process";
 
 import yargs from "yargs";
 
-type Command = {
-  command: string;
-  directory: string;
-  failOnText?: string;
-};
-
-type ConfigFile = {
-  commands: Command[];
-};
-
 type Options = {
   port: number;
-  serverName: string;
-  configPath: string;
+  secret: string;
+  buildScript: string;
+  runScript: string;
+  workingDirectory: string;
   dev: boolean;
 };
 
@@ -41,124 +32,170 @@ function getCommandLineOptions(): Options {
         return true;
       },
     })
-    .option("serverName", {
-      alias: "l",
-      describe: "A name used in logs to represent this service",
+    .option("secret", {
+      describe: "Secret value used within requests",
       type: "string",
     })
-    .option("configPath", {
-      alias: "c",
-      describe: "path to the config file (assumed to be relative to the parent directory of updateHelper)",
+    .option("buildScript", {
+      describe: "Path to the file used for building the software",
       type: "string",
-      default: "update-config.json",
+    })
+    .option("runScript", {
+      describe: "Path to the file used for running the software",
+      type: "string",
     })
     .option("dev", {
       describe: "Runs using a default development configPath",
       type: "boolean",
       default: false,
     })
-    .demandOption(["port", "serverName"])
+    .option("workingDirectory", {
+      alias: "d",
+      describe: "Working directory for the scripts to be ran in. Defaults to '../'",
+      type: "string",
+    })
     .argv as Options;
 
+console.log("Arguments", process.argv);
+
   if (options.dev) {
-    options.configPath = "dev-update-config.json";
+    options.port ??= 3000;
+    options.buildScript ??= "dev-build-script.sh";
+    options.runScript ??= "dev-run-script.sh";
+    options.secret ??= "password123";
+    options.workingDirectory ??= "./";
+  } else if (!options.buildScript || !options.runScript || !options.secret) {
+    throw new Error("Missing one or both of 'buildScript' or 'runScript'. You must provide them if not --dev.");
   }
+
+  options.workingDirectory ??= "../";
 
   _options = options;
-  return _options
+  return _options;
 }
 
-function getConfigFromFile(configPath: string): ConfigFile {
-  let config: ConfigFile | null;
-  try {
-    const configData = fs.readFileSync(options.configPath, "utf8");
-    config = JSON.parse(configData);
-  } catch (error) {
-    throw new Error(`Error loading config file. Path=${options.configPath} error=${error}`);
-  }
+// function getConfigFromFile(configPath: string): ConfigFile {
+//   let config: ConfigFile | null;
+//   try {
+//     const configData = fs.readFileSync(options.configPath, "utf8");
+//     config = JSON.parse(configData);
+//   } catch (error) {
+//     throw new Error(`Error loading config file. Path=${options.configPath} error=${error}`);
+//   }
 
-  if (!config) {
-    throw new Error(`Config file is not a valid json format! Check ${options.configPath}`);
-  }
-  if (config!.commands === undefined || !Array.isArray(config!.commands)) {
-    throw new Error(`Config commands section is incorrect Path=${options.configPath} commands=${config!.commands}`);
-  }
+//   if (!config) {
+//     throw new Error(`Config file is not a valid json format! Check ${options.configPath}`);
+//   }
+//   if (config.commands === undefined || !Array.isArray(config.commands)) {
+//     throw new Error(`Config 'commands' section is incorrect Path=${options.configPath} commands=${config.commands}`);
+//   }
 
-  return config;
-}
+//   return config;
+// }
 
 const options = getCommandLineOptions();
-const config = getConfigFromFile(options.configPath);
+// const config = getConfigFromFile(options.configPath);
 
 const app = express();
 app.use(express.json());
 app.use(expressQueue({ activeLimit: 1, queuedLimit: 2 }));
 
 // Helper function to execute a command in a directory
-async function executeCommand(command: string, directory: string): Promise<{ stdout: string, stderr: string }> {
+async function executeCommand(file: string, directory: string): Promise<{ stdout: string, stderr: string }> {
+  const adjustedFile = /.?\//.test(file) ? file : `./${file}`;
+
   return new Promise((resolve, reject) => {
-    exec(
-      command,
-      { cwd: directory },
+    execFile(
+      adjustedFile,
+      [],
+      { cwd: directory, shell: true },
       (error, stdout, stderr) => {
-        console.log(`Executing command "${command}" in "${directory}"...`);
+        console.log(`Executing file "${adjustedFile}" in "${directory}"...`);
         if (!error) {
           resolve({ stdout, stderr });
         } else {
           console.error(
-            `Error executing command "${command}" in "${directory}":`,
+            `Error executing file "${adjustedFile}" in "${directory}":`,
             error
           );
-          console.error(`Command "${command}" exited with error.`, error);
-          reject(new Error(`Command "${command}" exited with error code=${error.code} msg=${error.message}`));
+          reject(new Error(`File "${adjustedFile}" exited with error code=${error.code} msg=${error.message}`));
         }
       }
     );
   });
 };
 
+async function killProcess(process: ChildProcess) {
+  return new Promise<void>((resolve, reject) => {
+    process.on('close', () => {
+      console.log("The process was stopped!");
+      resolve();
+    })
+
+    console.log("Sent kill signal!");
+    process.kill();
+  });
+}
+
+let child_process: ChildProcess | null = null;
+
 // Function to process the queue
-async function processCommands(commands: Command[]) {
-  console.log(`Executing ${commands.length} commands.`)
-  for (const { command, directory, failOnText } of commands) {
-    const { stdout } = await executeCommand(
-      command,
-      directory // path.join("../", directory)
-    );
+async function runScripts() {
+  console.log(`Executing build script.`);
+  const {stdout, stderr} = await executeCommand(options.buildScript, options.workingDirectory);
 
-    console.log(`OUTPUT: ${stdout}`);
-
-    if (failOnText !== undefined && stdout.includes(failOnText)) {
-      console.error(`Extra fail case occurred of '${failOnText}' for command '${command}'`);
-      throw new Error(`Extra fail case occurred of '${failOnText}' for command '${command}'`);
-    }
+  if (stdout) {
+    console.log(`OUTPUT:\n${stdout}`);
   }
+
+  if (stderr) {
+    console.log(`ERROR OUTPUT:\n${stderr}`);
+  }
+
+  if (child_process) {
+    console.log("Found running process, sending the kill signal");
+    await killProcess(child_process);
+  } else {
+    console.log("Process wasn't running, continuing");
+  }
+
+  child_process = spawn(
+    "bash",
+    [options.runScript],
+    {
+      cwd: options.workingDirectory
+    })
+};
+
+type RequestBody = {
+  secret: string;
 };
 
 app.post("/", async (req, res, next) => {
-  console.log("Updating!");
-  try {
-    const { commands } = config as ConfigFile;
-    console.log("Got commands", commands);
-    try {
-      await processCommands(commands);
-    } catch (error: any) {
-      res.status(500).json({ message: "Got unexpected error!", error });
-      return;
-    }
-    res.status(200).json({ message: "Update commands completed successfully" });
+  console.log("Got request!");
+  // const { commands } = config as ConfigFile;
 
-    // console.log(`Restarting pm2 instance ${options.serverName}`);
-    // const { stdout, stderr } = await executeCommand(
-    //   `pm2 restart ${options.serverName}`,
-    //   "../"
-    // );
-    //should be unreachable!
-    // console.error(stderr);
-  } catch (error: any) {
-    console.log("Attempted marked as failing");
-    res.status(500).json({ error: error.message });
+  if (!req.body || !req.body.secret) {
+    console.log("Request rejected for missing 'secret' field.");
+    res.status(400).json({ message: "Missing required JSON body with 'secret' field." });
+    return;
   }
+
+  if (req.body.secret !== options.secret) {
+    console.log("Request rejected for incorrect secret.");
+    res.status(403).json({ message: "Secret doesn't match the server secret." });
+    return;
+  }
+
+  try {
+    await runScripts();
+  }
+  catch (error: any) {
+    console.log("Error bubbled up", error);
+    res.status(500).json({ message: "Got unexpected error!", error });
+    return;
+  }
+  res.status(200).json({ message: "Update commands completed successfully" });
 });
 
 app.listen(options.port, () => {

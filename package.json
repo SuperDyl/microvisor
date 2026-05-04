@@ -4,9 +4,10 @@
   "description": "listens for post requests and responds by following commands from a config file",
   "main": "update.js",
   "scripts": {
-    "develop": "concurrently -c bgGreen -n 'typescript,node' 'npm run dev-build' 'npm run dev-run'",
+    "serve": "npx tsc && node ./build/update.js",
+    "develop": "concurrently -P -c bgBlue,bgGreen -n 'typescript,node' 'npm run dev-build' 'npm run dev-run -- {@}'",
     "dev-build": "npx tsc --watch --preserveWatchOutput",
-    "dev-run": "node --watch --watch-preserve-output ./build/update.js -p 3000 -l updateServer --dev",
+    "dev-run": "node --watch --watch-preserve-output ./build/update.js --dev",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "SuperDyl",

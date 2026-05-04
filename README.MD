@@ -2,69 +2,69 @@
 
 Some node code to help with updating a project automatically by listening for a post request
 
-## Setup
+## Setup for regular use
+
+Usually, you should add this as a git submodule for your npm project:
+
+`git submodule add git@github.com:SuperDyl/microvisor.git microvisor`
+
+You then need to download any dependencies:
 
 ```bash
+cd microvisor
 npm i
-pm2 start ./updateHelper/update.js --name SOME_NAME -- --port PORT --serverName SOME_NAME --config CONFIG_PATH
 ```
 
-**SOME_NAME**: *OPTIONAL* A name for pm2 to call this service
+Run the project using `npm run -p <PORT> --buildScript <BUILD_SCRIPT_PATH> --runScript <RUN_SCRIPT_PATH> --secret <SECRET>`. As an example:
 
-**PORT**: The port the server listens on (DEFAULT: 3000)
-
-**SOME_NAME**: Must match the name given to pm2
-
-**CONFIG_PATH**: *OPTIONAL* Location of the config file (DEFAULT: ROOT/update-config.json)
-
-Optionally, you can include CONFIG_PATH as the final argument.
-It's Path should be from project ROOT
-
-## Root (Server working directory)
-
-
-## Config file
-
-This server will run the commands given to it in an update-config.json file stored one directory above it
-(this is assumed to be the root folder).
-
-Example:
-
-```json
-{
-  "commands": [
-    {
-      "command": "git pull",
-      "directory": "./",
-      "failOnText": "Already up to date."
-    },
-    {
-      "command": "npm install",
-      "directory": "back-end"
-    },
-    {
-      "command": "npm install",
-      "directory": "front-end"
-    },
-    {
-      "command": "npm run build",
-      "directory": "front-end"
-    }
-  ]
-}
+```bash
+npm run serve -p 3029 --buildScript build.sh --runScript run.sh --secret 'SOME_SECRET'
 ```
 
-**command**: the bash to run
+By default, the working directory will be just outside the project directory: `../`.
+You should include your build and run scripts within your regular project.
+These scripts *need* to be executable:
 
-**directory**: the directory (from the parent of NodeUpdateServer) to run the script from as the current working directory
+```bash
+sudo chmod +x <SCRIPT>
+```
 
-**failOnText**: *OPTIONAL*. If present, the stdout is checked for this line and the command treated as failing if it is present.
+You will need to setup some type of cron job or systemd script to cause the project to run at startup.
 
-If any command fails, the server stops there and returns a 500 level error
+## Command-line options
+
+* `--port -p <PORT>`: The port number the script listens to.
+* `--buildScript <PATH>`: The bash script used for building the project on updates.
+* `--runScript <PATH>`: The bash script used for running the project on restart.
+* `--workingDirectory -d <PATH>`: The directory the scripts are relative to. Defaults to `./`.
+* `--dev`: Sets up the project in development mode. This adds default values for most config options.
+
+## Development
+
+When using the `--dev` flag, development defaults are provided to the program.
+This flag is supplied if you use `npm run develop`.
+It will give default values of:
+
+* Port: `3000`
+* buildScript: `dev-build-script.sh`
+* runScript: `dev-run-script.sh`
+* workingDirectory: `./`
+
+Any of these can be overridden with the flags,
+though using npm you will need to provide `--` twice:
+
+```bash
+npm run develop -- -- -p 4000
+```
+
+With the default configuration,
+you can use the following command to test it:
+
+```bash
+curl -X POST -H 'Content-Type: application/json' http://localhost:3000 -d '{"secret": "password123"}'
+```
 
 ## TODO
 
-* Add a password to config
-* Use typescript
 * Simplify code: probably avoid using pm2?
 * Include a systemd file as part of regular projects
