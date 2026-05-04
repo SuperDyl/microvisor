@@ -30,6 +30,7 @@ sudo chmod +x <SCRIPT>
 ```
 
 You will need to setup some type of cron job or systemd script to cause the project to run at startup.
+An example file is provided as `example.service`.
 
 ## Command-line options
 

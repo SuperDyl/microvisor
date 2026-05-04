@@ -1,0 +1,20 @@
+[Unit]
+Description=A microvisor services
+After=network.target
+
+[Service]
+WorkingDirectory=/srv/website/SuperDyl-Website
+
+User=website
+Group=website
+
+Restart=always
+
+ExecStart=/usr/bin/npm run serve -- -p 3019
+
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=website
+
+[Install]
+WantedBy=multi-user.target
