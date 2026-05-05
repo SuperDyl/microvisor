@@ -72,25 +72,6 @@ function getCommandLineOptions(): Options {
   return _options;
 }
 
-// function getConfigFromFile(configPath: string): ConfigFile {
-//   let config: ConfigFile | null;
-//   try {
-//     const configData = fs.readFileSync(options.configPath, "utf8");
-//     config = JSON.parse(configData);
-//   } catch (error) {
-//     throw new Error(`Error loading config file. Path=${options.configPath} error=${error}`);
-//   }
-
-//   if (!config) {
-//     throw new Error(`Config file is not a valid json format! Check ${options.configPath}`);
-//   }
-//   if (config.commands === undefined || !Array.isArray(config.commands)) {
-//     throw new Error(`Config 'commands' section is incorrect Path=${options.configPath} commands=${config.commands}`);
-//   }
-
-//   return config;
-// }
-
 const options = getCommandLineOptions();
 // const config = getConfigFromFile(options.configPath);
 
