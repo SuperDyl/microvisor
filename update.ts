@@ -56,8 +56,6 @@ function getCommandLineOptions(): Options {
     })
     .argv as Options;
 
-console.log("Arguments", process.argv);
-
   if (options.dev) {
     options.port ??= 3000;
     options.buildScript ??= "dev-build-script.sh";
