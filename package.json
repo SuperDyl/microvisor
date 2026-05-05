@@ -5,7 +5,7 @@
   "main": "update.js",
   "scripts": {
     "serve": "npx tsc && node ./build/update.js",
-    "develop": "concurrently -P -c bgBlue,bgGreen -n 'typescript,node' 'npm run dev-build' 'npm run dev-run -- {@}'",
+    "develop": "concurrently -P -c bgBlue,bgGreen -n 'typescript,node' 'npm run dev-build' 'npm run dev-run -- {@}' -- ",
     "dev-build": "npx tsc --watch --preserveWatchOutput",
     "dev-run": "node --watch --watch-preserve-output ./build/update.js --dev",
     "test": "echo \"Error: no test specified\" && exit 1"
