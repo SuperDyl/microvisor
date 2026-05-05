@@ -15,12 +15,14 @@ type Options = {
 
 let _options: Options | null = null;
 
+console.log(process.argv);
+
 function getCommandLineOptions(): Options {
   if (_options !== null) {
     return _options;
   }
 
-  const options: Options = yargs
+  const options: Options = yargs(process.argv.slice(2))
     .option("port", {
       alias: "p",
       describe: "The port the server listens on",
@@ -54,7 +56,7 @@ function getCommandLineOptions(): Options {
       describe: "Working directory for the scripts to be ran in. Defaults to '../'",
       type: "string",
     })
-    .argv as Options;
+    .parse() as Options;
 
   if (options.dev) {
     options.port ??= 3000;
@@ -69,11 +71,10 @@ function getCommandLineOptions(): Options {
   options.workingDirectory ??= "../";
 
   _options = options;
-  return _options;
+  return _options as Options;
 }
 
 const options = getCommandLineOptions();
-// const config = getConfigFromFile(options.configPath);
 
 const app = express();
 app.use(express.json());
