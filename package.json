@@ -11,7 +11,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "SuperDyl",
-  "license": "ISC",
+  "license": "LGPL-3.0-only",
   "dependencies": {
     "express": "^4.19.2",
     "express-queue": "^0.0.13",
