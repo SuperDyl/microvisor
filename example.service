@@ -3,14 +3,14 @@ Description=A microvisor services
 After=network.target
 
 [Service]
-WorkingDirectory=/srv/website/SuperDyl-Website
+WorkingDirectory=/srv/website/SuperDyl-Website/microvisor
 
 User=website
 Group=website
 
 Restart=always
 
-ExecStart=/usr/bin/npm run serve -- -p 3019
+ExecStart=/srv/website/.local/share/fnm/fnm exec npm run serve -- -p 3019
 
 StandardOutput=syslog
 StandardError=syslog
