@@ -112,8 +112,12 @@ async function killProcess(process: ChildProcess) {
       resolve();
     })
 
-    console.log("Sent kill signal!");
-    process.kill();
+    if (process.kill()) {
+      console.log("Sent kill signal!");
+    } else {
+      console.log("Process was already stopped!");
+      resolve();
+    }
   });
 }
 
@@ -125,11 +129,11 @@ async function runScripts() {
   const {stdout, stderr} = await executeCommand(options.buildScript, options.workingDirectory);
 
   if (stdout) {
-    console.log(`OUTPUT:\n${stdout}`);
+    console.log(`BUILD OUTPUT:\n${stdout}`);
   }
 
   if (stderr) {
-    console.log(`ERROR OUTPUT:\n${stderr}`);
+    console.log(`BUILD ERROR OUTPUT:\n${stderr}`);
   }
 
   if (child_process) {
@@ -143,31 +147,34 @@ async function runScripts() {
     "bash",
     [options.runScript],
     {
-      cwd: options.workingDirectory
+      cwd: options.workingDirectory,
+      stdio: 'inherit',
     })
 };
 
 type RequestBody = {
-  secret: string;
+  secret?: string;
 };
 
 app.post("/", async (req, res, next) => {
   console.log("Got request!");
-  // const { commands } = config as ConfigFile;
 
-  if (!req.body || !req.body.secret) {
+  const body: RequestBody = req.body;
+
+  if (!body || !body.secret) {
     console.log("Request rejected for missing 'secret' field.");
     res.status(400).json({ message: "Missing required JSON body with 'secret' field." });
     return;
   }
 
-  if (req.body.secret !== options.secret) {
+  if (body.secret !== options.secret) {
     console.log("Request rejected for incorrect secret.");
     res.status(403).json({ message: "Secret doesn't match the server secret." });
     return;
   }
 
   try {
+    console.log("Running script!\nRUN OUTPUT:")
     await runScripts();
   }
   catch (error: any) {
