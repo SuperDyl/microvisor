@@ -63,7 +63,7 @@ function getCommandLineOptions(): Options {
     options.secret ??= "password123";
     options.workingDirectory ??= "./";
   } else if (!options.buildScript || !options.runScript || !options.secret) {
-    throw new Error("Missing one or both of 'buildScript' or 'runScript'. You must provide them if not --dev.");
+    throw new Error("Missing required parameters, must provide 'buildScript', 'runScript', and 'secret'.");
   }
 
   options.workingDirectory ??= "../";
