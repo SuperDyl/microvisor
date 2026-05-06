@@ -15,8 +15,6 @@ type Options = {
 
 let _options: Options | null = null;
 
-console.log(process.argv);
-
 function getCommandLineOptions(): Options {
   if (_options !== null) {
     return _options;
