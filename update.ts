@@ -79,27 +79,28 @@ app.use(express.json());
 app.use(expressQueue({ activeLimit: 1, queuedLimit: 2 }));
 
 // Helper function to execute a command in a directory
-async function executeCommand(file: string, directory: string): Promise<{ stdout: string, stderr: string }> {
+async function executeCommand(file: string, directory: string): Promise<void> {
   const adjustedFile = /.?\//.test(file) ? file : `./${file}`;
 
   return new Promise((resolve, reject) => {
-    execFile(
-      adjustedFile,
-      [],
-      { cwd: directory, shell: true },
-      (error, stdout, stderr) => {
-        console.log(`Executing file "${adjustedFile}" in "${directory}"...`);
-        if (!error) {
-          resolve({ stdout, stderr });
-        } else {
-          console.error(
-            `Error executing file "${adjustedFile}" in "${directory}":`,
-            error
-          );
-          reject(new Error(`File "${adjustedFile}" exited with error code=${error.code} msg=${error.message}`));
-        }
+    console.log(`Executing file "${adjustedFile}" in "${directory}"...`);
+    const spawnedProcess = spawn(
+      "bash",
+      [adjustedFile],
+      {
+        cwd: options.workingDirectory,
+        stdio: 'inherit',
+      })
+
+    spawnedProcess.on('close', (code) => {
+      if (code === 0) {
+          console.log("Build script completed!");
+          resolve();
+      } else {
+        console.error(`Error executing file "${adjustedFile}" in "${directory}". Got code=${code}`);
+        reject(new Error(`File "${adjustedFile}" exited with error code=${code}`));
       }
-    );
+    })
   });
 };
 
@@ -124,15 +125,7 @@ let child_process: ChildProcess | null = null;
 // Function to process the queue
 async function runScripts() {
   console.log(`Executing build script.`);
-  const {stdout, stderr} = await executeCommand(options.buildScript, options.workingDirectory);
-
-  if (stdout) {
-    console.log(`BUILD OUTPUT:\n${stdout}`);
-  }
-
-  if (stderr) {
-    console.log(`BUILD ERROR OUTPUT:\n${stderr}`);
-  }
+  await executeCommand(options.buildScript, options.workingDirectory);
 
   if (child_process) {
     console.log("Found running process, sending the kill signal");
